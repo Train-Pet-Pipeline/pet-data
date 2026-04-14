@@ -145,7 +145,12 @@ def train(store: FrameStore, params: dict, output_dir: Path) -> TrainReport:
     records = store.query_frames(
         FrameFilter(quality_flag="normal", is_anomaly_candidate=False, limit=count + 1)
     )
-    paths = [r.frame_path for r in records]
+    paths = [
+        str(Path(r.data_root) / r.frame_path)
+        if not Path(r.frame_path).is_absolute()
+        else r.frame_path
+        for r in records
+    ]
 
     # Shuffle deterministically before 80/20 split to avoid temporal bias
     rng = np.random.default_rng(42)

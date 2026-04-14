@@ -7,9 +7,16 @@ from pathlib import Path
 
 import torch
 
-from pet_data.storage.store import FrameStore
+from pet_data.storage.store import FrameRecord, FrameStore
 from pet_data.weak_supervision._image_util import load_and_normalize
 from pet_data.weak_supervision.train_autoencoder import FeedingAutoencoder
+
+
+def _resolve_frame_path(record: FrameRecord) -> str:
+    """Resolve frame_path to an absolute path using data_root if needed."""
+    if Path(record.frame_path).is_absolute():
+        return record.frame_path
+    return str(Path(record.data_root) / record.frame_path)
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +68,7 @@ def score_frames(store: FrameStore, model_path: Path, params: dict) -> ScoreRepo
     with torch.no_grad():
         for record in unscored:
             try:
-                tensor = load_and_normalize(record.frame_path).unsqueeze(0)
+                tensor = load_and_normalize(_resolve_frame_path(record)).unsqueeze(0)
             except (OSError, SyntaxError) as exc:
                 logger.warning(
                     '{"event": "score_frame_skip", "frame_id": "%s", "error": "%s"}',

@@ -30,7 +30,6 @@ def cmd_ingest(args: argparse.Namespace) -> None:
     from pet_data.storage.store import FrameStore
 
     params = load_params(args.params)
-    store = FrameStore(Path(params["data_root"]) / "frames.db")
 
     source_map = {
         "selfshot": SelfShotSource,
@@ -45,36 +44,45 @@ def cmd_ingest(args: argparse.Namespace) -> None:
         logger.error("Unknown source: %s. Available: %s", args.source, list(source_map.keys()))
         sys.exit(1)
 
-    src = source_map[args.source](store, params)
-    report = src.ingest()
+    with FrameStore(Path(params["data_root"]) / "frames.db") as store:
+        src = source_map[args.source](store, params)
+        report = src.ingest()
     logger.info("Ingest complete: %s", report)
 
 
 def cmd_dedup(args: argparse.Namespace) -> None:
-    """Run dedup pass — recheck frames missing phash or find new cross-source duplicates."""
-    from pet_data.processing.dedup import compute_phash
+    """Run dedup pass — compute missing phashes and detect cross-source duplicates."""
+    from pet_data.processing.dedup import compute_phash, dedup_check
     from pet_data.storage.store import FrameFilter, FrameStore
 
     params = load_params(args.params)
-    store = FrameStore(Path(params["data_root"]) / "frames.db")
 
-    all_frames = store.query_frames(FrameFilter(limit=100000))
-    existing_phashes = store.get_phashes()
-    updated = 0
-    removed = 0
+    with FrameStore(Path(params["data_root"]) / "frames.db") as store:
+        all_frames = store.query_frames(FrameFilter(limit=100000))
+        existing_phashes = store.get_phashes()
+        updated = 0
+        duplicates = 0
 
-    for frame in all_frames:
-        if frame.frame_id in existing_phashes:
-            continue
-        frame_path = Path(frame.data_root) / frame.frame_path
-        if not frame_path.exists():
-            continue
-        phash = compute_phash(frame_path)
-        store.update_phash(frame.frame_id, phash)
-        existing_phashes[frame.frame_id] = phash
-        updated += 1
+        for frame in all_frames:
+            frame_path = Path(frame.data_root) / frame.frame_path
+            if not frame_path.exists():
+                continue
 
-    logger.info("Dedup pass: updated %d phashes, removed %d duplicates", updated, removed)
+            if frame.frame_id not in existing_phashes:
+                phash = compute_phash(frame_path)
+                store.update_phash(frame.frame_id, phash)
+                existing_phashes[frame.frame_id] = phash
+                updated += 1
+
+                # Check newly hashed frame against all existing phashes
+                result = dedup_check(frame_path, existing_phashes, params)
+                if result.is_duplicate and result.duplicate_of != frame.frame_id:
+                    store.update_quality(frame.frame_id, "low", frame.blur_score or 0.0)
+                    duplicates += 1
+
+    logger.info(
+        '{"event": "dedup_pass", "updated": %d, "duplicates": %d}', updated, duplicates
+    )
 
 
 def cmd_quality(args: argparse.Namespace) -> None:
@@ -83,19 +91,19 @@ def cmd_quality(args: argparse.Namespace) -> None:
     from pet_data.storage.store import FrameFilter, FrameStore
 
     params = load_params(args.params)
-    store = FrameStore(Path(params["data_root"]) / "frames.db")
 
-    all_frames = store.query_frames(FrameFilter(limit=100000))
-    assessed = 0
-    for frame in all_frames:
-        if frame.blur_score is not None:
-            continue
-        frame_path = Path(frame.data_root) / frame.frame_path
-        if not frame_path.exists():
-            continue
-        result = assess_quality(frame_path, params)
-        store.update_quality(frame.frame_id, result.quality_flag, result.blur_score)
-        assessed += 1
+    with FrameStore(Path(params["data_root"]) / "frames.db") as store:
+        all_frames = store.query_frames(FrameFilter(limit=100000))
+        assessed = 0
+        for frame in all_frames:
+            if frame.blur_score is not None:
+                continue
+            frame_path = Path(frame.data_root) / frame.frame_path
+            if not frame_path.exists():
+                continue
+            result = assess_quality(frame_path, params)
+            store.update_quality(frame.frame_id, result.quality_flag, result.blur_score)
+            assessed += 1
 
     logger.info("Quality pass: assessed %d frames", assessed)
 
@@ -108,11 +116,11 @@ def cmd_augment(args: argparse.Namespace) -> None:
     from pet_data.storage.store import FrameStore
 
     params = load_params(args.params)
-    store = FrameStore(Path(params["data_root"]) / "frames.db")
 
-    endpoint = os.environ.get("WAN21_ENDPOINT")
-    generator = Wan21Generator(endpoint=endpoint) if endpoint else NullGenerator()
-    report = run_augmentation(store, params, generator=generator)
+    with FrameStore(Path(params["data_root"]) / "frames.db") as store:
+        endpoint = os.environ.get("WAN21_ENDPOINT")
+        generator = Wan21Generator(endpoint=endpoint) if endpoint else NullGenerator()
+        report = run_augmentation(store, params, generator=generator)
     logger.info("Augmentation complete: %s", report)
 
 
@@ -122,9 +130,10 @@ def cmd_train_ae(args: argparse.Namespace) -> None:
     from pet_data.weak_supervision.train_autoencoder import train
 
     params = load_params(args.params)
-    store = FrameStore(Path(params["data_root"]) / "frames.db")
-    output_dir = Path(params["data_root"]) / "models"
-    report = train(store, params, output_dir)
+
+    with FrameStore(Path(params["data_root"]) / "frames.db") as store:
+        output_dir = Path(params["data_root"]) / "models"
+        report = train(store, params, output_dir)
     logger.info("Training complete: %s", report)
 
 
@@ -134,9 +143,10 @@ def cmd_score_anomaly(args: argparse.Namespace) -> None:
     from pet_data.weak_supervision.score_anomaly import score_frames
 
     params = load_params(args.params)
-    store = FrameStore(Path(params["data_root"]) / "frames.db")
-    model_path = Path(params["data_root"]) / "models" / "autoencoder.pt"
-    report = score_frames(store, model_path, params)
+
+    with FrameStore(Path(params["data_root"]) / "frames.db") as store:
+        model_path = Path(params["data_root"]) / "models" / "autoencoder.pt"
+        report = score_frames(store, model_path, params)
     logger.info("Scoring complete: %s", report)
 
 
