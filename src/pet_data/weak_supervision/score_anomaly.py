@@ -5,11 +5,10 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 
-import numpy as np
 import torch
-from PIL import Image
 
-from pet_data.storage.store import FrameFilter, FrameStore
+from pet_data.storage.store import FrameStore
+from pet_data.weak_supervision._image_util import load_and_normalize
 from pet_data.weak_supervision.train_autoencoder import FeedingAutoencoder
 
 logger = logging.getLogger(__name__)
@@ -28,22 +27,6 @@ class ScoreReport:
     total_scored: int
     anomalies_found: int
     threshold: float
-
-
-def _load_image_tensor(frame_path: str) -> torch.Tensor:
-    """Load an image and normalize to [-1, 1] as a (1, 3, 224, 224) tensor.
-
-    Args:
-        frame_path: Absolute path to the image file.
-
-    Returns:
-        Tensor of shape (1, 3, 224, 224) normalized to [-1, 1].
-    """
-    img = Image.open(frame_path).convert("RGB").resize((224, 224))
-    arr = np.array(img, dtype=np.float32)
-    arr = arr / 127.5 - 1.0
-    tensor = torch.from_numpy(arr.transpose(2, 0, 1)).unsqueeze(0)
-    return tensor
 
 
 def score_frames(store: FrameStore, model_path: Path, params: dict) -> ScoreReport:
@@ -68,9 +51,7 @@ def score_frames(store: FrameStore, model_path: Path, params: dict) -> ScoreRepo
 
     logger.info('{"event": "score_frames_start", "model_path": "%s"}', model_path)
 
-    # FrameFilter doesn't support anomaly_score IS NULL, so fetch all and filter in Python
-    all_records = store.query_frames(FrameFilter(limit=10_000_000))
-    unscored = [r for r in all_records if r.anomaly_score is None]
+    unscored = store.query_unscored_frames()
 
     logger.info('{"event": "score_frames_unscored", "count": %d}', len(unscored))
 
@@ -79,10 +60,20 @@ def score_frames(store: FrameStore, model_path: Path, params: dict) -> ScoreRepo
 
     with torch.no_grad():
         for record in unscored:
-            tensor = _load_image_tensor(record.frame_path)
+            try:
+                tensor = load_and_normalize(record.frame_path).unsqueeze(0)
+            except (OSError, SyntaxError) as exc:
+                logger.warning(
+                    '{"event": "score_frame_skip", "frame_id": "%s", "error": "%s"}',
+                    record.frame_id,
+                    exc,
+                )
+                continue
             score_val = model.anomaly_score(tensor).item()
             is_candidate = score_val > threshold
-            store.update_anomaly(record.frame_id, is_candidate=is_candidate, score=score_val)
+            store.update_anomaly(
+                record.frame_id, is_candidate=is_candidate, score=score_val
+            )
             total_scored += 1
             if is_candidate:
                 anomalies_found += 1

@@ -8,10 +8,10 @@ from pathlib import Path
 import numpy as np
 import torch
 import torch.nn as nn
-from PIL import Image
 from torch.utils.data import DataLoader, Dataset
 
 from pet_data.storage.store import FrameFilter, FrameStore
+from pet_data.weak_supervision._image_util import load_and_normalize
 
 logger = logging.getLogger(__name__)
 
@@ -94,13 +94,7 @@ class _FrameDataset(Dataset):
         Returns:
             Tensor of shape (3, 224, 224) normalized to [-1, 1].
         """
-        img = Image.open(self._paths[idx]).convert("RGB").resize((224, 224))
-        arr = np.array(img, dtype=np.float32)
-        # Normalize to [-1, 1]: divide by 127.5, subtract 1
-        arr = arr / 127.5 - 1.0
-        # HWC -> CHW
-        tensor = torch.from_numpy(arr.transpose(2, 0, 1))
-        return tensor
+        return load_and_normalize(self._paths[idx])
 
 
 @dataclass
@@ -153,6 +147,9 @@ def train(store: FrameStore, params: dict, output_dir: Path) -> TrainReport:
     )
     paths = [r.frame_path for r in records]
 
+    # Shuffle deterministically before 80/20 split to avoid temporal bias
+    rng = np.random.default_rng(42)
+    rng.shuffle(paths)
     torch.manual_seed(42)
     split = int(len(paths) * 0.8)
     train_paths = paths[:split]

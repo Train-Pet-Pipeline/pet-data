@@ -438,6 +438,17 @@ class FrameStore:
         ).fetchall()
         return {row["annotation_status"]: row["cnt"] for row in rows}
 
+    def query_unscored_frames(self) -> list[FrameRecord]:
+        """Return all frames that have not been scored (anomaly_score IS NULL).
+
+        Returns:
+            List of :class:`FrameRecord` objects with no anomaly score.
+        """
+        rows = self._conn.execute(
+            "SELECT * FROM frames WHERE anomaly_score IS NULL"
+        ).fetchall()
+        return [self._row_to_record(r) for r in rows]
+
     def count_normal_frames(self) -> int:
         """Count frames suitable for autoencoder training.
 
