@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pet-data"
+version = "0.1.0"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "pet-schema @ git+https://github.com/Train-Pet-Pipeline/pet-schema.git@v1.0.0",
+    "Pillow>=10.0,<11.0",
+    "imagehash>=4.3,<5.0",
+    "decord>=0.6,<1.0",
+    "albumentations>=1.3,<2.0",
+    "torch>=2.1,<3.0",
+    "torchvision>=0.16,<1.0",
+    "alembic>=1.13,<2.0",
+    "scipy>=1.11,<2.0",
+    "tenacity>=8.0,<9.0",
+    "pyyaml>=6.0,<7.0",
+    "dvc>=3.40,<4.0",
+    "requests>=2.31,<3.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "ruff", "mypy", "pip-tools", "opencv-python-headless>=4.8"]
+youtube = ["yt-dlp>=2024.1"]
+community = ["praw>=7.7,<8.0"]
+
+[project.scripts]
+pet-data = "pet_data.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = false
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
