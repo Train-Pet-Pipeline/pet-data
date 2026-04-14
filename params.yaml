@@ -1,0 +1,24 @@
+data_root: "/data/pet-data"
+
+frames:
+  extract_fps: 1.0
+  dedup_hamming_threshold: 10
+  quality_blur_threshold: 100.0
+
+augmentation:
+  video_gen_count_per_seed: 10
+  distortion_conf_threshold: 0.5
+  traditional:
+    brightness_limit: 0.2
+    noise_var_limit: 0.02
+
+weak_supervision:
+  anomaly_score_threshold: 0.07
+  min_normal_frames: 2000
+  max_epochs: 100
+  batch_size: 32
+  learning_rate: 0.001
+
+dvc:
+  remote: "local"
+  remote_path: "/data/dvc-cache"
