@@ -39,3 +39,11 @@ class TestAssessQuality:
         result = assess_quality(sample_image, default_params)
         assert isinstance(result, QualityResult)
         assert isinstance(result.blur_score, float)
+
+    def test_corrupt_image_returns_failed(self, tmp_data_root: Path, default_params: dict) -> None:
+        """A corrupt file returns quality_flag='failed'."""
+        bad_path = tmp_data_root / "corrupt.png"
+        bad_path.write_bytes(b"not a valid image")
+        result = assess_quality(bad_path, default_params)
+        assert result.quality_flag == "failed"
+        assert result.blur_score == 0.0

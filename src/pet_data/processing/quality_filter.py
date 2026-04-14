@@ -21,11 +21,11 @@ class QualityResult:
 
 
 def assess_quality(image_path: Path, params: dict) -> QualityResult:
-    """
-    Assess frame quality using Laplacian variance.
+    """Assess frame quality using Laplacian variance.
 
-    Flags as 'low' if blur_score < threshold. Does NOT delete frames —
-    quality_flag is informational for downstream filtering.
+    Flags as 'low' if blur_score < threshold, 'failed' if the image cannot
+    be opened or processed. Does NOT delete frames — quality_flag is
+    informational for downstream filtering.
 
     Args:
         image_path: Path to image file.
@@ -36,10 +36,15 @@ def assess_quality(image_path: Path, params: dict) -> QualityResult:
     """
     threshold = params["frames"]["quality_blur_threshold"]
 
-    img = Image.open(image_path).convert("L")
-    arr = np.array(img, dtype=np.float64)
+    try:
+        with Image.open(image_path) as img:
+            gray = img.convert("L")
+            arr = np.array(gray, dtype=np.float64)
+    except (OSError, SyntaxError) as exc:
+        logger.warning("Failed to open image %s: %s", image_path.name, exc)
+        return QualityResult(quality_flag="failed", blur_score=0.0)
 
-    # Laplacian kernel convolution via numpy
+    # Laplacian kernel convolution via scipy
     laplacian = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]], dtype=np.float64)
     filtered = convolve2d(arr, laplacian, mode="valid")
     blur_score = float(filtered.var())

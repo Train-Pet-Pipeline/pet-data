@@ -23,8 +23,8 @@ class DedupResult:
 
 def compute_phash(image_path: Path) -> bytes:
     """Compute perceptual hash of an image, return 8-byte binary."""
-    img = Image.open(image_path)
-    h = imagehash.phash(img)
+    with Image.open(image_path) as img:
+        h = imagehash.phash(img)
     # h.hash is an 8x8 bool ndarray; packbits converts to 8 bytes
     return np.packbits(h.hash.flatten()).tobytes()
 
@@ -40,8 +40,10 @@ def dedup_check(
     existing_phashes: dict[str, bytes],
     params: dict,
 ) -> DedupResult:
-    """
-    Check if image is a duplicate of any existing frame.
+    """Check if image is a duplicate of any existing frame.
+
+    A frame is considered duplicate if its hamming distance to any existing
+    phash is strictly less than the threshold (threshold is exclusive).
 
     Args:
         image_path: Path to the image to check.
