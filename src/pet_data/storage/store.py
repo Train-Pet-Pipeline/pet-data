@@ -104,9 +104,46 @@ class FrameStore:
             str_path,
         )
 
+    def close(self) -> None:
+        """Close the underlying SQLite connection."""
+        self._conn.close()
+
+    def __enter__(self) -> FrameStore:
+        """Support ``with FrameStore(...) as store:`` usage."""
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        """Close connection on context-manager exit."""
+        self.close()
+
     # ------------------------------------------------------------------
     # Write helpers
     # ------------------------------------------------------------------
+
+    @staticmethod
+    def _record_to_params(frame: FrameRecord) -> dict:
+        """Convert a FrameRecord to a dict of SQL parameters."""
+        return {
+            "frame_id": frame.frame_id,
+            "video_id": frame.video_id,
+            "source": frame.source,
+            "frame_path": frame.frame_path,
+            "data_root": frame.data_root,
+            "timestamp_ms": frame.timestamp_ms,
+            "species": frame.species,
+            "breed": frame.breed,
+            "lighting": frame.lighting,
+            "bowl_type": frame.bowl_type,
+            "quality_flag": frame.quality_flag,
+            "blur_score": frame.blur_score,
+            "phash": frame.phash,
+            "aug_quality": frame.aug_quality,
+            "aug_seed": frame.aug_seed,
+            "parent_frame_id": frame.parent_frame_id,
+            "is_anomaly_candidate": int(frame.is_anomaly_candidate),
+            "anomaly_score": frame.anomaly_score,
+            "annotation_status": frame.annotation_status,
+        }
 
     def insert_frame(self, frame: FrameRecord) -> str:
         """Insert a single frame record and return its frame_id.
@@ -136,27 +173,7 @@ class FrameStore:
                 :annotation_status
             )
             """,
-            {
-                "frame_id": frame.frame_id,
-                "video_id": frame.video_id,
-                "source": frame.source,
-                "frame_path": frame.frame_path,
-                "data_root": frame.data_root,
-                "timestamp_ms": frame.timestamp_ms,
-                "species": frame.species,
-                "breed": frame.breed,
-                "lighting": frame.lighting,
-                "bowl_type": frame.bowl_type,
-                "quality_flag": frame.quality_flag,
-                "blur_score": frame.blur_score,
-                "phash": frame.phash,
-                "aug_quality": frame.aug_quality,
-                "aug_seed": frame.aug_seed,
-                "parent_frame_id": frame.parent_frame_id,
-                "is_anomaly_candidate": int(frame.is_anomaly_candidate),
-                "anomaly_score": frame.anomaly_score,
-                "annotation_status": frame.annotation_status,
-            },
+            self._record_to_params(frame),
         )
         self._conn.commit()
         logger.info('{"event": "insert_frame", "frame_id": "%s"}', frame.frame_id)
@@ -192,30 +209,7 @@ class FrameStore:
         Raises:
             sqlite3.IntegrityError: Propagated after rollback if a duplicate exists.
         """
-        rows = [
-            {
-                "frame_id": f.frame_id,
-                "video_id": f.video_id,
-                "source": f.source,
-                "frame_path": f.frame_path,
-                "data_root": f.data_root,
-                "timestamp_ms": f.timestamp_ms,
-                "species": f.species,
-                "breed": f.breed,
-                "lighting": f.lighting,
-                "bowl_type": f.bowl_type,
-                "quality_flag": f.quality_flag,
-                "blur_score": f.blur_score,
-                "phash": f.phash,
-                "aug_quality": f.aug_quality,
-                "aug_seed": f.aug_seed,
-                "parent_frame_id": f.parent_frame_id,
-                "is_anomaly_candidate": int(f.is_anomaly_candidate),
-                "anomaly_score": f.anomaly_score,
-                "annotation_status": f.annotation_status,
-            }
-            for f in frames
-        ]
+        rows = [self._record_to_params(f) for f in frames]
         try:
             self._conn.executemany(
                 """
@@ -313,10 +307,12 @@ class FrameStore:
             quality_flag: New quality tier ('normal', 'low', or 'failed').
             blur_score: New Laplacian variance blur score.
         """
-        self._conn.execute(
+        cursor = self._conn.execute(
             "UPDATE frames SET quality_flag = ?, blur_score = ? WHERE frame_id = ?",
             (quality_flag, blur_score, frame_id),
         )
+        if cursor.rowcount == 0:
+            raise ValueError(f"Frame not found: {frame_id}")
         self._conn.commit()
         logger.info(
             '{"event": "update_quality", "frame_id": "%s", "quality_flag": "%s"}',
@@ -331,11 +327,16 @@ class FrameStore:
             frame_id: Primary key of the frame to update.
             is_candidate: Whether the frame is an anomaly candidate.
             score: Anomaly detector confidence score.
+
+        Raises:
+            ValueError: If ``frame_id`` does not exist.
         """
-        self._conn.execute(
+        cursor = self._conn.execute(
             "UPDATE frames SET is_anomaly_candidate = ?, anomaly_score = ? WHERE frame_id = ?",
             (int(is_candidate), score, frame_id),
         )
+        if cursor.rowcount == 0:
+            raise ValueError(f"Frame not found: {frame_id}")
         self._conn.commit()
         logger.info(
             '{"event": "update_anomaly", "frame_id": "%s", "is_candidate": %s}',
@@ -349,11 +350,16 @@ class FrameStore:
         Args:
             frame_id: Primary key of the frame to update.
             status: New annotation status value (must satisfy the column CHECK constraint).
+
+        Raises:
+            ValueError: If ``frame_id`` does not exist.
         """
-        self._conn.execute(
+        cursor = self._conn.execute(
             "UPDATE frames SET annotation_status = ? WHERE frame_id = ?",
             (status, frame_id),
         )
+        if cursor.rowcount == 0:
+            raise ValueError(f"Frame not found: {frame_id}")
         self._conn.commit()
         logger.info(
             '{"event": "update_annotation_status", "frame_id": "%s", "status": "%s"}',
@@ -370,11 +376,16 @@ class FrameStore:
             frame_id: Primary key of the augmented frame.
             aug_quality: Augmentation result — 'ok' or 'failed'.
             parent_frame_id: frame_id of the original frame this was derived from.
+
+        Raises:
+            ValueError: If ``frame_id`` does not exist.
         """
-        self._conn.execute(
+        cursor = self._conn.execute(
             "UPDATE frames SET aug_quality = ?, parent_frame_id = ? WHERE frame_id = ?",
             (aug_quality, parent_frame_id, frame_id),
         )
+        if cursor.rowcount == 0:
+            raise ValueError(f"Frame not found: {frame_id}")
         self._conn.commit()
         logger.info(
             '{"event": "update_augmentation", "frame_id": "%s", "aug_quality": "%s"}',
@@ -388,11 +399,16 @@ class FrameStore:
         Args:
             frame_id: Primary key of the frame to update.
             phash: Raw bytes of the perceptual hash.
+
+        Raises:
+            ValueError: If ``frame_id`` does not exist.
         """
-        self._conn.execute(
+        cursor = self._conn.execute(
             "UPDATE frames SET phash = ? WHERE frame_id = ?",
             (phash, frame_id),
         )
+        if cursor.rowcount == 0:
+            raise ValueError(f"Frame not found: {frame_id}")
         self._conn.commit()
         logger.info('{"event": "update_phash", "frame_id": "%s"}', frame_id)
 

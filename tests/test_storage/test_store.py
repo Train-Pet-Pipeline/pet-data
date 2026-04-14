@@ -25,7 +25,7 @@ def _make_record(frame_id: str = "fr_001", source: str = "youtube") -> FrameReco
         frame_id=frame_id,
         video_id="vid_001",
         source=source,
-        frame_path="frames/fr_001.jpg",
+        frame_path=f"frames/{frame_id}.jpg",
         data_root="/data",
     )
 
