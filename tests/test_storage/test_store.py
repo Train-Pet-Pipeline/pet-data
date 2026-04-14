@@ -236,10 +236,10 @@ class TestStatistics:
         assert counts["approved"] == 1
 
     def test_count_normal_frames(self, store: FrameStore) -> None:
-        """count_normal_frames excludes low-quality and rejected frames."""
-        store.insert_frame(_make_record("fr_001"))  # normal + pending  → counted
-        store.insert_frame(_make_record("fr_002"))  # normal + rejected → excluded
-        store.insert_frame(_make_record("fr_003"))  # low quality       → excluded
-        store.update_annotation_status("fr_002", "rejected")
+        """count_normal_frames excludes low-quality and anomaly-candidate frames."""
+        store.insert_frame(_make_record("fr_001"))  # normal + not anomaly → counted
+        store.insert_frame(_make_record("fr_002"))  # normal + anomaly     → excluded
+        store.insert_frame(_make_record("fr_003"))  # low quality          → excluded
+        store.update_anomaly("fr_002", is_candidate=True, score=0.9)
         store.update_quality("fr_003", "low", 5.0)
         assert store.count_normal_frames() == 1

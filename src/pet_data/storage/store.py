@@ -423,16 +423,16 @@ class FrameStore:
         return {row["annotation_status"]: row["cnt"] for row in rows}
 
     def count_normal_frames(self) -> int:
-        """Count frames with quality_flag='normal' that have not been rejected.
+        """Count frames suitable for autoencoder training.
 
         Returns:
-            Number of normal, non-rejected frames.
+            Number of frames with quality_flag='normal' and is_anomaly_candidate=0.
         """
         row = self._conn.execute(
             """
             SELECT COUNT(*) AS cnt FROM frames
             WHERE quality_flag = 'normal'
-              AND annotation_status NOT IN ('rejected')
+              AND is_anomaly_candidate = 0
             """
         ).fetchone()
         return row["cnt"]
