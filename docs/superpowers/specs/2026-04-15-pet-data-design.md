@@ -159,18 +159,21 @@ class BaseSource(ABC):
     def ingest(self) -> IngestReport:
         """模板方法：download → extract → dedup → quality → store。子类不覆盖。"""
         report = IngestReport()
+        # 批量加载已有 phash，避免逐帧查库（N 次查询 → 1 次）
+        existing_phashes = self.store.get_phashes()
         for item in self.download():
             if not self.validate_metadata(item):
                 report.skipped += 1
                 continue
             frames = self.extractor.extract(item, self.params)
             for frame_path in frames:
-                dedup_result = dedup_check(frame_path, self.store, self.params)
+                dedup_result = dedup_check(frame_path, existing_phashes, self.params)
                 if dedup_result.is_duplicate:
                     report.duplicates += 1
                     continue
                 quality = assess_quality(frame_path, self.params)
                 self.store.insert_frame(...)
+                existing_phashes[frame_id] = dedup_result.phash  # 增量更新内存缓存
                 report.inserted += 1
         return report
 
@@ -274,7 +277,8 @@ CREATE INDEX idx_frames_status    ON frames(annotation_status);
 CREATE INDEX idx_frames_source    ON frames(source);
 CREATE INDEX idx_frames_quality   ON frames(quality_flag);
 CREATE INDEX idx_frames_anomaly   ON frames(is_anomaly_candidate, anomaly_score DESC);
-CREATE INDEX idx_frames_phash     ON frames(phash);
+-- 注意：phash 不建 B-tree 索引，汉明距离比较需在 Python 内存中完成
+-- 批量加载 phash 由 store.get_phashes() 实现
 ```
 
 ### FrameRecord 与 FrameFilter
@@ -325,9 +329,10 @@ class DedupResult:
 
 def compute_phash(image_path: Path) -> bytes: ...
 def hamming_distance(hash_a: bytes, hash_b: bytes) -> int: ...
-def dedup_check(image_path: Path, store: FrameStore, params: dict,
-                source: str | None = None) -> DedupResult:
-    """跨来源全局去重。阈值从 params["frames"]["dedup_hamming_threshold"] 读取。"""
+def dedup_check(image_path: Path, existing_phashes: dict[str, bytes],
+                params: dict) -> DedupResult:
+    """跨来源全局去重。接收内存中的 phash 字典，避免逐帧查库。
+    阈值从 params["frames"]["dedup_hamming_threshold"] 读取。"""
 ```
 
 ### quality_filter.py
