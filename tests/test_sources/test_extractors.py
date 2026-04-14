@@ -62,6 +62,10 @@ class TestVideoExtractor:
             import cv2
         except ImportError:
             pytest.skip("opencv not installed")
+        try:
+            import decord  # noqa: F401
+        except ImportError:
+            pytest.skip("decord not installed")
 
         video_path = tmp_data_root / "test.mp4"
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
@@ -101,6 +105,10 @@ class TestAutoExtractor:
             import cv2
         except ImportError:
             pytest.skip("opencv not installed")
+        try:
+            import decord  # noqa: F401
+        except ImportError:
+            pytest.skip("decord not installed")
 
         video_path = tmp_data_root / "test.mp4"
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
