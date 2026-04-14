@@ -28,15 +28,15 @@ class ImageExtractor(FrameExtractor):
     """Extract frames from image sources — copy/convert to standard format."""
 
     def extract(self, item: RawItem, params: dict) -> list[Path]:
-        """Copy image to output directory, return [path]."""
+        """Copy image to output directory as PNG, return [path]."""
         dest = self.output_dir / f"{item.metadata.video_id}_{item.resource_path.stem}.png"
-        if item.resource_path.suffix.lower() in (".png", ".jpg", ".jpeg"):
+        if item.resource_path.suffix.lower() == ".png":
             shutil.copy2(item.resource_path, dest)
         else:
             from PIL import Image
 
-            img = Image.open(item.resource_path)
-            img.save(dest, format="PNG")
+            with Image.open(item.resource_path) as img:
+                img.save(dest, format="PNG")
         logger.info("Extracted image: %s → %s", item.resource_path.name, dest.name)
         return [dest]
 
