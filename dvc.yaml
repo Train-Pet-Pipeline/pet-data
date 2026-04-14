@@ -1,0 +1,56 @@
+stages:
+  ingest:
+    cmd: python -m pet_data.cli ingest --source ${source}
+    deps:
+      - src/pet_data/sources/
+      - src/pet_data/storage/store.py
+    params:
+      - frames
+    outs:
+      - data/frames/:
+          cache: true
+
+  dedup:
+    cmd: python -m pet_data.cli dedup
+    deps:
+      - src/pet_data/processing/dedup.py
+      - data/frames/
+    params:
+      - frames.dedup_hamming_threshold
+
+  quality:
+    cmd: python -m pet_data.cli quality
+    deps:
+      - src/pet_data/processing/quality_filter.py
+      - data/frames/
+    params:
+      - frames.quality_blur_threshold
+
+  augment:
+    cmd: python -m pet_data.cli augment
+    deps:
+      - src/pet_data/augmentation/
+      - data/frames/
+    params:
+      - augmentation
+    outs:
+      - data/augmented/:
+          cache: true
+
+  train_ae:
+    cmd: python -m pet_data.cli train-ae
+    deps:
+      - src/pet_data/weak_supervision/train_autoencoder.py
+    params:
+      - weak_supervision
+    outs:
+      - models/autoencoder.pt:
+          cache: true
+
+  score_anomaly:
+    cmd: python -m pet_data.cli score-anomaly
+    deps:
+      - src/pet_data/weak_supervision/score_anomaly.py
+      - models/autoencoder.pt
+    params:
+      - weak_supervision.anomaly_score_threshold
