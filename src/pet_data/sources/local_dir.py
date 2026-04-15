@@ -14,6 +14,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Literal, cast
 
 from pet_data.sources.base import BaseSource, RawItem, SourceMetadata
 from pet_data.sources.extractors import AutoExtractor
@@ -77,7 +78,7 @@ class LocalDirSource(BaseSource):
                 yield RawItem(
                     source=self.source_name,
                     resource_path=file_path,
-                    resource_type=resource_type,
+                    resource_type=cast(Literal["video", "image"], resource_type),
                     metadata=SourceMetadata(
                         species=species,
                         breed=None,

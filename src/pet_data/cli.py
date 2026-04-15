@@ -47,7 +47,7 @@ def cmd_ingest(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     with FrameStore(Path(params["data_root"]) / "frames.db") as store:
-        src = source_map[args.source](store, params)
+        src = source_map[args.source](store, params)  # type: ignore[abstract]
         report = src.ingest()
     logger.info("Ingest complete: %s", report)
 

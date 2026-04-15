@@ -6,6 +6,7 @@ import logging
 import re
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Literal, cast
 
 import yaml
 from PIL import Image
@@ -102,7 +103,7 @@ class HospitalSource(BaseSource):
             yield RawItem(
                 source=self.source_name,
                 resource_path=file_path,
-                resource_type=resource_type,
+                resource_type=cast(Literal["video", "image"], resource_type),
                 metadata=SourceMetadata(
                     species=meta.get("species"),
                     breed=meta.get("breed"),

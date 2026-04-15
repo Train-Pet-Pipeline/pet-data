@@ -5,6 +5,7 @@ import logging
 import os
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Literal, cast
 
 import requests as req
 
@@ -87,7 +88,7 @@ class CommunitySource(BaseSource):
                 yield RawItem(
                     source=self.source_name,
                     resource_path=local_path,
-                    resource_type=resource_type,
+                    resource_type=cast(Literal["video", "image"], resource_type),
                     metadata=SourceMetadata(
                         species=None,
                         breed=None,
