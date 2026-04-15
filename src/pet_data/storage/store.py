@@ -1,12 +1,13 @@
 """Storage layer for pet-data: FrameStore with full CRUD over SQLite."""
 from __future__ import annotations
 
-import logging
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
 
-logger = logging.getLogger(__name__)
+from pet_infra.logging import get_logger
+
+logger = get_logger("pet-data")
 
 
 @dataclass
