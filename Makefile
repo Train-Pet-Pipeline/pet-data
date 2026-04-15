@@ -3,7 +3,7 @@
 .PHONY: setup test
 
 setup:
-	pip install -e ".[dev]" && pip-compile pyproject.toml -o requirements.txt
+	python -m pip install -e ".[dev]" && python -m piptools compile pyproject.toml -o requirements.txt
 
 test:
 	pytest tests/ -v
