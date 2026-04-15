@@ -24,6 +24,7 @@ def cmd_ingest(args: argparse.Namespace) -> None:
     from pet_data.sources.coco_pet import CocoPetSource
     from pet_data.sources.community import CommunitySource
     from pet_data.sources.hospital import HospitalSource
+    from pet_data.sources.local_dir import LocalDirSource
     from pet_data.sources.oxford_pet import OxfordPetSource
     from pet_data.sources.selfshot import SelfShotSource
     from pet_data.sources.youtube import YoutubeSource
@@ -38,6 +39,7 @@ def cmd_ingest(args: argparse.Namespace) -> None:
         "youtube": YoutubeSource,
         "community": CommunitySource,
         "hospital": HospitalSource,
+        "local_dir": LocalDirSource,
     }
 
     if args.source not in source_map:
