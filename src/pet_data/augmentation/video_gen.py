@@ -8,7 +8,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import requests
-from tenacity import RetryError, retry, stop_after_attempt, wait_exponential
+from pet_infra.retry import standard_retry
+from tenacity import RetryError
 
 from pet_data.storage.store import FrameFilter, FrameStore
 
@@ -82,7 +83,7 @@ class Wan21Generator(VideoGenerator):
             )
             return None
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1))
+    @standard_retry
     def _call_api(self, seed_image: Path, prompt: str, seed: int) -> Path:
         """Send the generation request with tenacity retry.
 
