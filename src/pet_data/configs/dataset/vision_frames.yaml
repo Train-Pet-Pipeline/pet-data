@@ -1,0 +1,4 @@
+type: pet_data.vision_frames
+modality: vision
+args:
+  db_path: ${oc.env:PET_DATA_DB,/data/pet-data/pet_data.db}
