@@ -7,16 +7,12 @@ import pet_data.datasets.vision_frames  # noqa: F401  (trigger registration)
 
 
 def test_vision_frames_dataset_registered():
-    """Plugin must be discoverable via DATASETS registry."""
-    cls = DATASETS.get("pet_data.vision_frames")
-    assert cls is not None
+    assert "pet_data.vision_frames" in DATASETS.module_dict
 
 
 def test_vision_frames_build_yields_vision_samples(fresh_db_with_frames):
-    """build() must yield one VisionSample per qualifying row."""
     from pet_schema.samples import VisionSample
-
-    cls = DATASETS.get("pet_data.vision_frames")
+    cls = DATASETS.module_dict["pet_data.vision_frames"]
     ds = cls()
     samples = list(ds.build({"db_path": str(fresh_db_with_frames), "modality_filter": "vision"}))
     assert len(samples) == 3
@@ -24,8 +20,7 @@ def test_vision_frames_build_yields_vision_samples(fresh_db_with_frames):
 
 
 def test_vision_frames_modality_method(fresh_db_with_frames):
-    """modality() must return the string 'vision'."""
-    cls = DATASETS.get("pet_data.vision_frames")
+    cls = DATASETS.module_dict["pet_data.vision_frames"]
     ds = cls()
     assert ds.modality() == "vision"
 
@@ -33,29 +28,16 @@ def test_vision_frames_modality_method(fresh_db_with_frames):
 def test_vision_frames_skips_rows_missing_required_fields(tmp_path):
     """Rows missing frame_width/height/brightness_score (NULL) must be skipped, not raise."""
     from pet_data.storage.store import FrameRecord, FrameStore
-
     store = FrameStore(tmp_path / "db.sqlite")
-    store.insert_frame(
-        FrameRecord(
-            frame_id="incomplete",
-            video_id="v",
-            source="youtube",
-            frame_path="x.jpg",
-            data_root="/data",
-            timestamp_ms=0,
-            species="dog",
-            lighting="bright",
-            bowl_type=None,
-            quality_flag="normal",
-            blur_score=50.0,
-            modality="vision",
-            storage_uri="local:///data/x.jpg",
-            frame_width=None,
-            frame_height=None,
-            brightness_score=None,
-        )
-    )
+    store.insert_frame(FrameRecord(
+        frame_id="incomplete", video_id="v", source="youtube",
+        frame_path="x.jpg", data_root="/data",
+        timestamp_ms=0, species="dog", lighting="bright",
+        bowl_type=None, quality_flag="normal", blur_score=50.0,
+        modality="vision", storage_uri="local:///data/x.jpg",
+        frame_width=None, frame_height=None, brightness_score=None,
+    ))
     store.close()
-    cls = DATASETS.get("pet_data.vision_frames")
+    cls = DATASETS.module_dict["pet_data.vision_frames"]
     ds = cls()
-    assert list(ds.build({"db_path": str(tmp_path / "db.sqlite")})) == []
+    assert list(ds.build({"db_path": str(tmp_path/"db.sqlite")})) == []

@@ -5,7 +5,6 @@ import sqlite3
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, Literal
 
-from mmengine.registry import Registry
 from pet_infra.base.dataset import BaseDataset
 from pet_infra.registry import DATASETS
 from pet_schema import BaseSample
@@ -15,17 +14,20 @@ from pet_data.storage.adapter import frame_row_to_vision_sample
 if TYPE_CHECKING:
     import datasets as hf_datasets
 
-# Child registry with scope "pet_data" so DATASETS.get("pet_data.vision_frames") resolves.
-_PET_DATA_DATASETS = Registry("dataset", scope="pet_data", parent=DATASETS)
 
-
-@_PET_DATA_DATASETS.register_module(name="vision_frames", force=True)
+@DATASETS.register_module(name="pet_data.vision_frames", force=True)
 class VisionFramesDataset(BaseDataset):
     """VisionSample iterator over the pet-data frames table.
 
     `dataset_config` keys:
         db_path: str — required, path to pet-data sqlite file
         modality_filter: str — optional, defaults to "vision"
+
+    Registered as the flat key ``pet_data.vision_frames`` in
+    :data:`pet_infra.registry.DATASETS`. Lookup via ``DATASETS.module_dict``
+    (mmengine's ``.get()`` parses dots as ``scope.module`` and returns None
+    for flat dotted names — this matches the preflight lookup pattern in
+    pet-infra v2.0.0).
     """
 
     def modality(self) -> Literal["vision", "audio", "sensor", "multimodal"]:
@@ -33,14 +35,7 @@ class VisionFramesDataset(BaseDataset):
         return "vision"
 
     def build(self, dataset_config: dict) -> Iterable[BaseSample]:
-        """Yield VisionSample objects from the frames table.
-
-        Args:
-            dataset_config: Must contain 'db_path'; optionally 'modality_filter'.
-
-        Yields:
-            VisionSample instances for rows with non-null required fields.
-        """
+        """Yield VisionSample objects from the frames table."""
         db_path = dataset_config["db_path"]
         mfilter = dataset_config.get("modality_filter", "vision")
         conn = sqlite3.connect(str(db_path))
@@ -59,14 +54,7 @@ class VisionFramesDataset(BaseDataset):
             conn.close()
 
     def to_hf_dataset(self, dataset_config: dict) -> hf_datasets.Dataset:
-        """Return a HuggingFace Dataset from the vision frames.
-
-        Args:
-            dataset_config: Passed directly to build().
-
-        Returns:
-            hf_datasets.Dataset with one row per VisionSample.
-        """
+        """Return a HuggingFace Dataset materialised from :meth:`build`."""
         import datasets as hf_datasets
 
         records = [s.model_dump(mode="json") for s in self.build(dataset_config)]
