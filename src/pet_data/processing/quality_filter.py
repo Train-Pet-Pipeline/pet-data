@@ -18,6 +18,9 @@ class QualityResult:
 
     quality_flag: str  # "normal" / "low" / "failed"
     blur_score: float  # Laplacian variance — lower = blurrier
+    width: int | None = None
+    height: int | None = None
+    brightness_score: float | None = None  # mean luminance normalized to [0, 1]
 
 
 def assess_quality(image_path: Path, params: dict) -> QualityResult:
@@ -32,7 +35,8 @@ def assess_quality(image_path: Path, params: dict) -> QualityResult:
         params: Must contain frames.quality_blur_threshold.
 
     Returns:
-        QualityResult with quality_flag and blur_score.
+        QualityResult with quality_flag, blur_score, width, height,
+        and brightness_score.
     """
     threshold = params["frames"]["quality_blur_threshold"]
 
@@ -40,6 +44,7 @@ def assess_quality(image_path: Path, params: dict) -> QualityResult:
         with Image.open(image_path) as img:
             gray = img.convert("L")
             arr = np.array(gray, dtype=np.float64)
+            w, h = img.width, img.height
     except (OSError, SyntaxError) as exc:
         logger.warning("Failed to open image %s: %s", image_path.name, exc)
         return QualityResult(quality_flag="failed", blur_score=0.0)
@@ -48,6 +53,7 @@ def assess_quality(image_path: Path, params: dict) -> QualityResult:
     laplacian = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]], dtype=np.float64)
     filtered = convolve2d(arr, laplacian, mode="valid")
     blur_score = float(filtered.var())
+    brightness = float(arr.mean() / 255.0)
 
     quality_flag = "normal" if blur_score >= threshold else "low"
 
@@ -58,4 +64,10 @@ def assess_quality(image_path: Path, params: dict) -> QualityResult:
         quality_flag,
     )
 
-    return QualityResult(quality_flag=quality_flag, blur_score=blur_score)
+    return QualityResult(
+        quality_flag=quality_flag,
+        blur_score=blur_score,
+        width=w,
+        height=h,
+        brightness_score=brightness,
+    )
