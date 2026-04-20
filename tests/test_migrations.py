@@ -41,3 +41,40 @@ def test_002_backfills_storage_uri_for_existing_rows(tmp_path):
     assert row[0] == "vision"
     assert row[1] == "local:///data/frames/a.jpg"
     conn.close()
+
+
+def test_003_upgrade_creates_audio_table(tmp_path):
+    """Test that migration 003 creates audio_samples table with correct columns."""
+    conn = sqlite3.connect(str(tmp_path / "db.sqlite"))
+    load_migration(1).upgrade(conn)
+    load_migration(2).upgrade(conn)
+    load_migration(3).upgrade(conn)
+    tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    assert "audio_samples" in tables
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(audio_samples)").fetchall()}
+    required_cols = {
+        "sample_id",
+        "modality",
+        "storage_uri",
+        "duration_s",
+        "sample_rate",
+        "num_channels",
+        "clip_type",
+    }
+    assert required_cols <= cols
+    conn.close()
+
+
+def test_003_downgrade_drops_audio_table(tmp_path):
+    """Test that migration 003 downgrade removes the audio_samples table."""
+    conn = sqlite3.connect(str(tmp_path / "db.sqlite"))
+    m1 = load_migration(1)
+    m2 = load_migration(2)
+    m3 = load_migration(3)
+    m1.upgrade(conn)
+    m2.upgrade(conn)
+    m3.upgrade(conn)
+    m3.downgrade(conn)
+    tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    assert "audio_samples" not in tables
+    conn.close()
