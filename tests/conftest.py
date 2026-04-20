@@ -8,6 +8,8 @@ import pytest
 import yaml
 from PIL import Image
 
+from pet_data.storage.store import FrameRecord, FrameStore
+
 
 @pytest.fixture
 def tmp_data_root(tmp_path: Path) -> Path:
@@ -52,3 +54,33 @@ def sample_image_different(tmp_data_root: Path) -> Path:
     arr = rng.integers(0, 255, (224, 224, 3), dtype=np.uint8)
     Image.fromarray(arr).save(img_path)
     return img_path
+
+
+@pytest.fixture
+def fresh_db_with_frames(tmp_path: Path) -> Path:
+    """FrameStore DB with 3 VisionSample-compliant rows (all required fields populated)."""
+    db_path = tmp_path / "db.sqlite"
+    store = FrameStore(db_path)
+    for i in range(3):
+        store.insert_frame(
+            FrameRecord(
+                frame_id=f"sha256:f{i}",
+                video_id=f"v{i}",
+                source="youtube",
+                frame_path=f"frames/{i}.jpg",
+                data_root="/data",
+                timestamp_ms=1000 * i,
+                species="dog",
+                lighting="bright",
+                bowl_type="ceramic",
+                quality_flag="normal",
+                blur_score=120.0,
+                modality="vision",
+                storage_uri=f"local:///data/frames/{i}.jpg",
+                frame_width=1920,
+                frame_height=1080,
+                brightness_score=0.6,
+            )
+        )
+    store.close()
+    return db_path

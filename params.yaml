@@ -1,5 +1,9 @@
 data_root: "/data/pet-data"
 
+sample:
+  default_modality: vision
+  storage_scheme: local
+
 frames:
   extract_fps: 1.0
   dedup_hamming_threshold: 10
