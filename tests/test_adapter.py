@@ -93,3 +93,9 @@ def test_lighting_unknown_raises():
     """Unmapped lighting values should raise ValueError with clear message."""
     with pytest.raises(ValueError, match="no mapping to pet_schema.Lighting"):
         frame_row_to_vision_sample(_frame_row(lighting="strobe"))
+
+
+def test_null_timestamp_raises():
+    """NULL timestamp_ms on a frame row must raise ValueError, not crash opaquely."""
+    with pytest.raises(ValueError, match="timestamp_ms is NULL"):
+        frame_row_to_vision_sample(_frame_row(timestamp_ms=None))

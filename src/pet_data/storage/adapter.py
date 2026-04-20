@@ -55,7 +55,7 @@ def frame_row_to_vision_sample(row: Mapping[str, Any]) -> VisionSample:
         source=SourceInfo(
             source_type=row["source"],
             source_id=row.get("video_id") or row["frame_id"],
-            license=row.get("source_license"),
+            license=None,
         ),
         pet_species=row.get("species"),
         frame_width=row["frame_width"],
