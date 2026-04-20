@@ -1,6 +1,7 @@
-import pet_data
-import pet_schema
 import pet_infra
+import pet_schema
+
+import pet_data
 
 
 def test_pet_data_version():
