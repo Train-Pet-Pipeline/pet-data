@@ -37,6 +37,12 @@ class TestMigration001:
             "anomaly_score",
             "annotation_status",
             "created_at",
+            # Phase 2 columns added by migration 002
+            "modality",
+            "storage_uri",
+            "frame_width",
+            "frame_height",
+            "brightness_score",
         }
         assert columns == expected_columns
 
@@ -53,11 +59,13 @@ class TestMigration001:
             "idx_frames_source",
             "idx_frames_quality",
             "idx_frames_anomaly",
+            # Phase 2 index added by migration 002
+            "idx_frames_modality",
         }
         assert expected_indexes.issubset(index_names)
         # SQLite also creates sqlite_autoindex_frames_1 for the PRIMARY KEY
         explicit_indexes = {n for n in index_names if not n.startswith("sqlite_autoindex_")}
-        assert len(explicit_indexes) == 4
+        assert len(explicit_indexes) == 5
 
     def test_idempotent_init(self, tmp_path: Path) -> None:
         """Creating two FrameStore instances pointing at the same DB file does not error."""

@@ -102,13 +102,20 @@ class BaseSource(ABC):
                     frame_id = str(uuid.uuid4())
                     data_root = self.params.get("data_root", "")
 
+                    rel_path = (
+                        str(frame_path.relative_to(Path(data_root)))
+                        if data_root and frame_path.is_relative_to(Path(data_root))
+                        else str(frame_path)
+                    )
+                    storage_uri = (
+                        f"local://{data_root}/{rel_path}" if data_root else f"local://{rel_path}"
+                    )
+
                     record = FrameRecord(
                         frame_id=frame_id,
                         video_id=item.metadata.video_id,
                         source=self.source_name,
-                        frame_path=str(frame_path.relative_to(Path(data_root)))
-                        if data_root and frame_path.is_relative_to(Path(data_root))
-                        else str(frame_path),
+                        frame_path=rel_path,
                         data_root=data_root,
                         species=item.metadata.species,
                         breed=item.metadata.breed,
@@ -117,6 +124,11 @@ class BaseSource(ABC):
                         quality_flag=quality.quality_flag,
                         blur_score=quality.blur_score,
                         phash=dedup_result.phash,
+                        modality="vision",
+                        storage_uri=storage_uri,
+                        frame_width=quality.width,
+                        frame_height=quality.height,
+                        brightness_score=quality.brightness_score,
                     )
 
                     self.store.insert_frame(record)

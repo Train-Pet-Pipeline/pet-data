@@ -137,3 +137,63 @@ class TestIngestPipeline:
         report = src.ingest()
         assert report.inserted == 1
         assert report.duplicates == 1
+
+    def test_inserted_frame_has_modality_and_storage_uri(
+        self,
+        store: FrameStore,
+        default_params: dict,
+        sample_image: Path,
+        tmp_data_root: Path,
+    ) -> None:
+        """Inserted FrameRecord carries modality='vision' and storage_uri."""
+        item = RawItem(
+            source="dummy",
+            resource_path=sample_image,
+            resource_type="image",
+            metadata=SourceMetadata(
+                species="dog", breed=None, lighting="bright",
+                bowl_type=None, device_model=None, video_id="vid-001",
+            ),
+        )
+        src = DummySource(store, default_params, items=[item])
+        src.extractor = ImageExtractor(output_dir=tmp_data_root / "out")
+        src.ingest()
+
+        from pet_data.storage.store import FrameFilter
+
+        rows = store.query_frames(FrameFilter())
+        assert len(rows) == 1
+        record = rows[0]
+        assert record.modality == "vision"
+        assert record.storage_uri.startswith("local://")
+
+    def test_inserted_frame_has_vision_sample_fields(
+        self,
+        store: FrameStore,
+        default_params: dict,
+        sample_image: Path,
+        tmp_data_root: Path,
+    ) -> None:
+        """Inserted FrameRecord has frame_width, frame_height, brightness_score populated."""
+        item = RawItem(
+            source="dummy",
+            resource_path=sample_image,
+            resource_type="image",
+            metadata=SourceMetadata(
+                species="dog", breed=None, lighting="bright",
+                bowl_type=None, device_model=None, video_id="vid-002",
+            ),
+        )
+        src = DummySource(store, default_params, items=[item])
+        src.extractor = ImageExtractor(output_dir=tmp_data_root / "out")
+        src.ingest()
+
+        from pet_data.storage.store import FrameFilter
+
+        rows = store.query_frames(FrameFilter())
+        assert len(rows) == 1
+        record = rows[0]
+        assert record.frame_width == 224
+        assert record.frame_height == 224
+        assert record.brightness_score is not None
+        assert 0.0 <= record.brightness_score <= 1.0

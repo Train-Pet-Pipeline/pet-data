@@ -1,9 +1,11 @@
 """Storage layer for pet-data: FrameStore with full CRUD over SQLite."""
 from __future__ import annotations
 
+import importlib.util
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
+from types import ModuleType
 
 from pet_infra.logging import get_logger
 
@@ -55,6 +57,11 @@ class FrameRecord:
     is_anomaly_candidate: bool = False
     anomaly_score: float | None = None
     annotation_status: str = "pending"
+    modality: str = "vision"
+    storage_uri: str = ""
+    frame_width: int | None = None
+    frame_height: int | None = None
+    brightness_score: float | None = None
 
 
 @dataclass
@@ -74,6 +81,7 @@ class FrameFilter:
     quality_flag: str | None = None
     annotation_status: str | None = None
     is_anomaly_candidate: bool | None = None
+    modality: str | None = None
     limit: int = 1000
     offset: int = 0
 
@@ -100,10 +108,48 @@ class FrameStore:
         schema_path = Path(__file__).parent / "schema.sql"
         self._conn.executescript(schema_path.read_text())
         self._conn.commit()
+        self._apply_subsequent_migrations()
         logger.info(
             '{"event": "frame_store_init", "db_path": "%s"}',
             str_path,
         )
+
+    def _apply_subsequent_migrations(self) -> None:
+        """Run all migrations 002+ from the migrations directory (idempotent).
+
+        Uses ``importlib.util.spec_from_file_location`` because migration filenames
+        start with digits and cannot be imported via dotted names.  Tolerates
+        ``OperationalError: duplicate column name`` so that re-running is safe.
+        """
+        migrations_dir = Path(__file__).parent / "migrations"
+        migration_files = sorted(migrations_dir.glob("[0-9][0-9][0-9]_*.py"))
+        for path in migration_files:
+            number = int(path.stem[:3])
+            if number < 2:
+                continue
+            mod = self._load_migration_module(path)
+            try:
+                mod.upgrade(self._conn)
+            except sqlite3.OperationalError as exc:
+                if "duplicate column name" in str(exc):
+                    continue
+                raise
+
+    @staticmethod
+    def _load_migration_module(path: Path) -> ModuleType:
+        """Load a migration module from a filesystem path.
+
+        Args:
+            path: Absolute path to the migration ``.py`` file.
+
+        Returns:
+            The loaded module with ``upgrade`` and ``downgrade`` callables.
+        """
+        spec = importlib.util.spec_from_file_location(f"migration_{path.stem}", path)
+        assert spec is not None and spec.loader is not None
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)  # type: ignore[union-attr]
+        return mod
 
     def close(self) -> None:
         """Close the underlying SQLite connection."""
@@ -144,6 +190,11 @@ class FrameStore:
             "is_anomaly_candidate": int(frame.is_anomaly_candidate),
             "anomaly_score": frame.anomaly_score,
             "annotation_status": frame.annotation_status,
+            "modality": frame.modality,
+            "storage_uri": frame.storage_uri,
+            "frame_width": frame.frame_width,
+            "frame_height": frame.frame_height,
+            "brightness_score": frame.brightness_score,
         }
 
     def insert_frame(self, frame: FrameRecord) -> str:
@@ -165,13 +216,15 @@ class FrameStore:
                 timestamp_ms, species, breed, lighting, bowl_type,
                 quality_flag, blur_score, phash, aug_quality, aug_seed,
                 parent_frame_id, is_anomaly_candidate, anomaly_score,
-                annotation_status
+                annotation_status,
+                modality, storage_uri, frame_width, frame_height, brightness_score
             ) VALUES (
                 :frame_id, :video_id, :source, :frame_path, :data_root,
                 :timestamp_ms, :species, :breed, :lighting, :bowl_type,
                 :quality_flag, :blur_score, :phash, :aug_quality, :aug_seed,
                 :parent_frame_id, :is_anomaly_candidate, :anomaly_score,
-                :annotation_status
+                :annotation_status,
+                :modality, :storage_uri, :frame_width, :frame_height, :brightness_score
             )
             """,
             self._record_to_params(frame),
@@ -219,13 +272,15 @@ class FrameStore:
                     timestamp_ms, species, breed, lighting, bowl_type,
                     quality_flag, blur_score, phash, aug_quality, aug_seed,
                     parent_frame_id, is_anomaly_candidate, anomaly_score,
-                    annotation_status
+                    annotation_status,
+                    modality, storage_uri, frame_width, frame_height, brightness_score
                 ) VALUES (
                     :frame_id, :video_id, :source, :frame_path, :data_root,
                     :timestamp_ms, :species, :breed, :lighting, :bowl_type,
                     :quality_flag, :blur_score, :phash, :aug_quality, :aug_seed,
                     :parent_frame_id, :is_anomaly_candidate, :anomaly_score,
-                    :annotation_status
+                    :annotation_status,
+                    :modality, :storage_uri, :frame_width, :frame_height, :brightness_score
                 )
                 """,
                 rows,
@@ -268,6 +323,9 @@ class FrameStore:
         if filters.is_anomaly_candidate is not None:
             clauses.append("is_anomaly_candidate = ?")
             params.append(int(filters.is_anomaly_candidate))
+        if filters.modality is not None:
+            clauses.append("modality = ?")
+            params.append(filters.modality)
 
         where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
         params.extend([filters.limit, filters.offset])
@@ -501,4 +559,140 @@ class FrameStore:
             is_anomaly_candidate=bool(row["is_anomaly_candidate"]),
             anomaly_score=row["anomaly_score"],
             annotation_status=row["annotation_status"],
+            modality=row["modality"] if "modality" in row.keys() else "vision",
+            storage_uri=row["storage_uri"] if "storage_uri" in row.keys() else "",
+            frame_width=row["frame_width"] if "frame_width" in row.keys() else None,
+            frame_height=row["frame_height"] if "frame_height" in row.keys() else None,
+            brightness_score=row["brightness_score"] if "brightness_score" in row.keys() else None,
         )
+
+
+# ---------------------------------------------------------------------------
+# AudioSampleRow + AudioStore
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class AudioSampleRow:
+    """Represents a single audio sample stored in the audio_samples table.
+
+    Attributes:
+        sample_id: Unique identifier (e.g. sha256 digest) for this sample.
+        storage_uri: URI to the audio file (e.g. 'local:///audio/a.wav').
+        captured_at: ISO-8601 timestamp of when the audio was captured.
+        source_type: Provenance category — 'youtube', 'community', 'device', or 'synthetic'.
+        source_id: Dataset or collection identifier (e.g. 'esc50').
+        source_license: SPDX licence string (e.g. 'CC-BY') or None.
+        pet_species: Species label ('dog', 'cat', …) or None.
+        duration_s: Audio clip length in seconds.
+        sample_rate: Audio sample rate in Hz.
+        num_channels: Number of audio channels.
+        snr_db: Signal-to-noise ratio in decibels, or None if unknown.
+        clip_type: Semantic label — 'bark', 'meow', 'purr', 'silence', 'ambient', or None.
+    """
+
+    sample_id: str
+    storage_uri: str
+    captured_at: str
+    source_type: str
+    source_id: str
+    source_license: str | None = None
+    pet_species: str | None = None
+    duration_s: float = 0.0
+    sample_rate: int = 0
+    num_channels: int = 1
+    snr_db: float | None = None
+    clip_type: str | None = None
+
+
+class AudioStore:
+    """SQLite-backed store for audio sample records.
+
+    Operates on the ``audio_samples`` table created by migration 003.
+    Accepts an **open** :class:`sqlite3.Connection` (unlike :class:`FrameStore`
+    which takes a path).
+    """
+
+    def __init__(self, conn: sqlite3.Connection) -> None:
+        """Initialise AudioStore with an open database connection.
+
+        Args:
+            conn: An open :class:`sqlite3.Connection` with ``row_factory`` set
+                to ``sqlite3.Row``.
+        """
+        self._conn = conn
+
+    def insert(self, row: AudioSampleRow) -> str:
+        """Insert a single audio sample record and return its sample_id.
+
+        Args:
+            row: The :class:`AudioSampleRow` to persist.
+
+        Returns:
+            The ``sample_id`` of the inserted record.
+
+        Raises:
+            sqlite3.IntegrityError: If ``sample_id`` already exists.
+        """
+        self._conn.execute(
+            """
+            INSERT INTO audio_samples (
+                sample_id, storage_uri, captured_at,
+                source_type, source_id, source_license,
+                pet_species, duration_s, sample_rate, num_channels,
+                snr_db, clip_type
+            ) VALUES (
+                :sample_id, :storage_uri, :captured_at,
+                :source_type, :source_id, :source_license,
+                :pet_species, :duration_s, :sample_rate, :num_channels,
+                :snr_db, :clip_type
+            )
+            """,
+            {
+                "sample_id": row.sample_id,
+                "storage_uri": row.storage_uri,
+                "captured_at": row.captured_at,
+                "source_type": row.source_type,
+                "source_id": row.source_id,
+                "source_license": row.source_license,
+                "pet_species": row.pet_species,
+                "duration_s": row.duration_s,
+                "sample_rate": row.sample_rate,
+                "num_channels": row.num_channels,
+                "snr_db": row.snr_db,
+                "clip_type": row.clip_type,
+            },
+        )
+        self._conn.commit()
+        logger.info('{"event": "audio_store_insert", "sample_id": "%s"}', row.sample_id)
+        return row.sample_id
+
+    def query(self, clip_type: str | None = None) -> list[AudioSampleRow]:
+        """Return audio samples optionally filtered by clip_type.
+
+        Args:
+            clip_type: When given, restrict results to this clip type.
+
+        Returns:
+            List of :class:`AudioSampleRow` objects matching the filter.
+        """
+        _fields = AudioSampleRow.__dataclass_fields__
+        if clip_type is not None:
+            db_rows = self._conn.execute(
+                "SELECT * FROM audio_samples WHERE clip_type = ?", (clip_type,)
+            ).fetchall()
+        else:
+            db_rows = self._conn.execute("SELECT * FROM audio_samples").fetchall()
+        return [
+            AudioSampleRow(**{k: r[k] for k in r.keys() if k in _fields})
+            for r in db_rows
+        ]
+
+    def count(self) -> int:
+        """Return the total number of audio sample records.
+
+        Returns:
+            Integer count of rows in the audio_samples table.
+        """
+        row = self._conn.execute("SELECT COUNT(*) AS cnt FROM audio_samples").fetchone()
+        return row["cnt"]
