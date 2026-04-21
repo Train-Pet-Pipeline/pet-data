@@ -7,6 +7,15 @@ convention — see ``pet_infra._register``) at CLI startup to trigger the
 """
 from __future__ import annotations
 
+try:
+    import pet_infra  # noqa: F401
+except ImportError as e:
+    raise ImportError(
+        "pet-data requires pet-infra to be installed first. "
+        "Install via 'pip install pet-infra @ git+https://github.com/Train-Pet-Pipeline/pet-infra@<tag>' "
+        "using the tag pinned in pet-infra/docs/compatibility_matrix.yaml."
+    ) from e
+
 
 def register_all() -> None:
     """Import (or reload) pet-data plugin modules to trigger registration side-effects."""
