@@ -7,6 +7,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "pet-data"
 version = "1.2.0"
+license = {text = "BUSL-1.1"}
 requires-python = ">=3.11,<3.12"
 dependencies = [
     "pet-schema @ git+https://github.com/Train-Pet-Pipeline/pet-schema.git@v2.0.0",
