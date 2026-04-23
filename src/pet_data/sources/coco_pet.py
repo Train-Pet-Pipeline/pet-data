@@ -24,7 +24,8 @@ class CocoPetSource(BaseSource):
     - Reads annotations/instances_train2017.json for cat (id=17) / dog (id=18)
     """
 
-    source_name = "coco"
+    ingester_name = "coco"
+    default_provenance = "academic_dataset"
 
     def __init__(self, store, params: dict) -> None:
         """Initialize with ImageExtractor."""
@@ -64,7 +65,7 @@ class CocoPetSource(BaseSource):
                 continue
 
             yield RawItem(
-                source=self.source_name,
+                source=self.ingester_name,
                 resource_path=img_path,
                 resource_type="image",
                 metadata=SourceMetadata(

@@ -38,6 +38,12 @@ def augment_frame(
     trad_params = params["augmentation"]["traditional"]
     brightness_limit = trad_params["brightness_limit"]
     noise_var_limit = trad_params["noise_var_limit"]
+    hue_shift_limit = trad_params["hue_shift_limit"]
+    sat_shift_limit = trad_params["sat_shift_limit"]
+    val_shift_limit = trad_params["val_shift_limit"]
+    shift_limit = trad_params["shift_limit"]
+    scale_limit = trad_params["scale_limit"]
+    rotate_limit = trad_params["rotate_limit"]
 
     transforms: list[tuple[str, alb.BasicTransform]] = [
         (
@@ -58,18 +64,18 @@ def augment_frame(
         (
             "hue",
             alb.HueSaturationValue(
-                hue_shift_limit=20,
-                sat_shift_limit=30,
-                val_shift_limit=20,
+                hue_shift_limit=hue_shift_limit,
+                sat_shift_limit=sat_shift_limit,
+                val_shift_limit=val_shift_limit,
                 p=1.0,
             ),
         ),
         (
             "shift",
             alb.ShiftScaleRotate(
-                shift_limit=0.05,
-                scale_limit=0.05,
-                rotate_limit=15,
+                shift_limit=shift_limit,
+                scale_limit=scale_limit,
+                rotate_limit=rotate_limit,
                 border_mode=cv2.BORDER_REFLECT_101,
                 p=1.0,
             ),

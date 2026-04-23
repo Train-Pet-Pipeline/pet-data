@@ -10,6 +10,7 @@ def test_frame_row_to_vision_sample_roundtrip():
     row = {
         "frame_id": "sha256:abc",
         "source": "youtube",
+        "provenance_type": "youtube",
         "video_id": "vid1",
         "frame_path": "frames/a.jpg",
         "data_root": "/data",
@@ -57,6 +58,7 @@ def _frame_row(**overrides):
     base = {
         "frame_id": "sha256:abc",
         "source": "youtube",
+        "provenance_type": "youtube",
         "video_id": "vid1",
         "frame_path": "a.jpg",
         "data_root": "/d",
@@ -99,3 +101,41 @@ def test_null_timestamp_raises():
     """NULL timestamp_ms on a frame row must raise ValueError, not crash opaquely."""
     with pytest.raises(ValueError, match="timestamp_ms is NULL"):
         frame_row_to_vision_sample(_frame_row(timestamp_ms=None))
+
+
+def test_vision_sample_provenance_and_ingester_separated():
+    """F1 FIX: adapter uses provenance_type for source_type, source for ingester.
+
+    This test would FAIL with the old code: source='oxford_pet' would be passed
+    directly as SourceInfo.source_type, which is not a valid SourceType literal,
+    causing a ValidationError at runtime.
+
+    After the fix:
+    - VisionSample.source.source_type = row['provenance_type'] = 'academic_dataset'
+    - VisionSample.source.ingester = row['source'] = 'oxford_pet'
+    """
+    row = _frame_row(
+        source="oxford_pet",
+        provenance_type="academic_dataset",
+    )
+    vs = frame_row_to_vision_sample(row)
+    assert vs.source.source_type == "academic_dataset"
+    assert vs.source.ingester == "oxford_pet"
+
+
+def test_all_ingester_names_produce_valid_vision_samples():
+    """All 7 ingester names with correct provenance_type must not crash adapter."""
+    ingester_to_provenance = {
+        "youtube": "youtube",
+        "community": "community",
+        "selfshot": "community",
+        "oxford_pet": "academic_dataset",
+        "coco": "academic_dataset",
+        "hospital": "device",
+        "local_dir": "device",
+    }
+    for ingester, provenance in ingester_to_provenance.items():
+        row = _frame_row(source=ingester, provenance_type=provenance)
+        vs = frame_row_to_vision_sample(row)
+        assert vs.source.source_type == provenance
+        assert vs.source.ingester == ingester

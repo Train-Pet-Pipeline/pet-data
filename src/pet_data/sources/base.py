@@ -6,7 +6,9 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, ClassVar, Literal
+
+from pet_schema.enums import SourceType
 
 from pet_data.processing.dedup import dedup_check
 from pet_data.processing.quality_filter import assess_quality
@@ -54,14 +56,19 @@ class BaseSource(ABC):
     """Abstract base for all data sources.
 
     Subclasses must:
-    - Set source_name (str) and extractor (FrameExtractor) as class attributes
+    - Set ingester_name (str) and extractor (FrameExtractor) as class attributes
     - Implement download() and validate_metadata()
 
     The ingest() template method handles the full pipeline:
     download → extract → dedup → quality → store.
+
+    Concept separation (Phase 3):
+    - ingester_name: which code produced this sample (implementation identity)
+    - default_provenance: legal/compliance category (declared in subclasses)
     """
 
-    source_name: str
+    ingester_name: str
+    default_provenance: ClassVar[SourceType]
     extractor: FrameExtractor
 
     def __init__(self, store: FrameStore, params: dict) -> None:
@@ -114,7 +121,7 @@ class BaseSource(ABC):
                     record = FrameRecord(
                         frame_id=frame_id,
                         video_id=item.metadata.video_id,
-                        source=self.source_name,
+                        source=self.ingester_name,
                         frame_path=rel_path,
                         data_root=data_root,
                         species=item.metadata.species,
@@ -129,6 +136,7 @@ class BaseSource(ABC):
                         frame_width=quality.width,
                         frame_height=quality.height,
                         brightness_score=quality.brightness_score,
+                        provenance_type=self.default_provenance,
                     )
 
                     self.store.insert_frame(record)

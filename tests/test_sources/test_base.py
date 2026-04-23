@@ -14,7 +14,8 @@ from pet_data.storage.store import FrameStore
 class DummySource(BaseSource):
     """Minimal BaseSource implementation for testing."""
 
-    source_name = "dummy"
+    ingester_name = "dummy"
+    default_provenance = "device"  # test-only; arbitrary valid literal
 
     def __init__(
         self,

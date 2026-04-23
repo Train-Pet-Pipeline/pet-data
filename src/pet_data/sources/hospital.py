@@ -59,7 +59,8 @@ class HospitalSource(BaseSource):
     CRITICAL: All PII scrubbing happens at ingest time, not query time.
     """
 
-    source_name = "hospital"
+    ingester_name = "hospital"
+    default_provenance = "device"  # partner hospital hardware captures (first-party data)
 
     def __init__(self, store, params: dict) -> None:
         """Initialize with AutoExtractor."""
@@ -101,7 +102,7 @@ class HospitalSource(BaseSource):
             safe_vid = sanitize_filename(file_path)
 
             yield RawItem(
-                source=self.source_name,
+                source=self.ingester_name,
                 resource_path=file_path,
                 resource_type=cast(Literal["video", "image"], resource_type),
                 metadata=SourceMetadata(

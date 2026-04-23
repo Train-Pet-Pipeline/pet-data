@@ -47,13 +47,24 @@ def _normalize_lighting(db_value: str) -> str:
 
 
 def frame_row_to_vision_sample(row: Mapping[str, Any]) -> VisionSample:
-    """Convert a video frame row from sqlite to VisionSample."""
+    """Convert a video frame row from sqlite to VisionSample.
+
+    Concept separation (Phase 3):
+    - source_type comes from row["provenance_type"] (legal/compliance category)
+    - ingester comes from row["source"] (which code produced this sample)
+
+    Before this fix, row["source"] (the ingester_name) was passed directly as
+    source_type, which would cause a ValidationError for non-youtube/community
+    ingesters (oxford_pet, coco, selfshot, hospital, local_dir) because those
+    strings are not valid SourceType literals.
+    """
     return VisionSample(
         sample_id=row["frame_id"],
         storage_uri=row["storage_uri"],
         captured_at=_parse_timestamp_ms(row["timestamp_ms"]),
         source=SourceInfo(
-            source_type=row["source"],
+            source_type=row["provenance_type"],
+            ingester=row["source"],
             source_id=row.get("video_id") or row["frame_id"],
             license=None,
         ),

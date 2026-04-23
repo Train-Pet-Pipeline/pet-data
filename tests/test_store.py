@@ -59,3 +59,28 @@ def test_framestore_production_db_has_phase2_columns(tmp_path: Path) -> None:
     }
     assert "audio_samples" in tables, "audio_samples table missing"
     store.close()
+
+
+def test_framestore_insert_populates_provenance_type(tmp_path: Path) -> None:
+    """FrameRecord with provenance_type is stored and retrieved correctly."""
+    store = FrameStore(tmp_path / "db.sqlite")
+    record = FrameRecord(
+        frame_id="fr_prov_001",
+        video_id="vid_001",
+        source="oxford_pet",
+        frame_path="frames/fr_prov_001.jpg",
+        data_root="/data",
+        modality="vision",
+        storage_uri="local:///data/frames/fr_prov_001.jpg",
+        frame_width=224,
+        frame_height=224,
+        brightness_score=0.5,
+        provenance_type="academic_dataset",
+    )
+    store.insert_frame(record)
+
+    result = store.get_frame("fr_prov_001")
+    assert result is not None
+    assert result.provenance_type == "academic_dataset"
+    assert result.source == "oxford_pet"  # ingester_name preserved in source column
+    store.close()
