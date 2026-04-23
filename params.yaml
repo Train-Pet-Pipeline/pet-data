@@ -22,6 +22,7 @@ weak_supervision:
   max_epochs: 100
   batch_size: 32
   learning_rate: 0.001
+  train_val_split_ratio: 0.8
 
 dvc:
   remote: "local"

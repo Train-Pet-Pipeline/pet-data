@@ -133,6 +133,7 @@ def train(store: FrameStore, params: dict, output_dir: Path) -> TrainReport:
     max_epochs: int = ws_params["max_epochs"]
     batch_size: int = ws_params["batch_size"]
     learning_rate: float = ws_params["learning_rate"]
+    train_val_split_ratio: float = ws_params["train_val_split_ratio"]
 
     count = store.count_normal_frames()
     logger.info('{"event": "train_autoencoder_start", "normal_frame_count": %d}', count)
@@ -152,11 +153,11 @@ def train(store: FrameStore, params: dict, output_dir: Path) -> TrainReport:
         for r in records
     ]
 
-    # Shuffle deterministically before 80/20 split to avoid temporal bias
+    # Shuffle deterministically before train/val split to avoid temporal bias
     rng = np.random.default_rng(42)
     rng.shuffle(paths)
     torch.manual_seed(42)
-    split = int(len(paths) * 0.8)
+    split = int(len(paths) * train_val_split_ratio)
     train_paths = paths[:split]
     val_paths = paths[split:]
 
