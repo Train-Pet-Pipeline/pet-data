@@ -11,7 +11,7 @@ def test_pet_data_version():
 
 
 def test_pet_data_pins_phase1_foundation():
-    assert pet_schema.version.SCHEMA_VERSION == "3.1.0"
+    assert pet_schema.version.SCHEMA_VERSION == "3.2.1"
     assert pet_infra.__version__.startswith("2.")
 
 
