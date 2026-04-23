@@ -36,6 +36,8 @@ class FrameRecord:
         is_anomaly_candidate: Whether this frame has been flagged for anomaly review.
         anomaly_score: Anomaly detector confidence score.
         annotation_status: Current annotation lifecycle state.
+        provenance_type: Legal/compliance provenance category (SourceType literal).
+            Separate from source (ingester_name). Added Phase 3 concept separation.
     """
 
     frame_id: str
@@ -62,6 +64,7 @@ class FrameRecord:
     frame_width: int | None = None
     frame_height: int | None = None
     brightness_score: float | None = None
+    provenance_type: str = "device"
 
 
 @dataclass
@@ -195,6 +198,7 @@ class FrameStore:
             "frame_width": frame.frame_width,
             "frame_height": frame.frame_height,
             "brightness_score": frame.brightness_score,
+            "provenance_type": frame.provenance_type,
         }
 
     def insert_frame(self, frame: FrameRecord) -> str:
@@ -217,14 +221,16 @@ class FrameStore:
                 quality_flag, blur_score, phash, aug_quality, aug_seed,
                 parent_frame_id, is_anomaly_candidate, anomaly_score,
                 annotation_status,
-                modality, storage_uri, frame_width, frame_height, brightness_score
+                modality, storage_uri, frame_width, frame_height, brightness_score,
+                provenance_type
             ) VALUES (
                 :frame_id, :video_id, :source, :frame_path, :data_root,
                 :timestamp_ms, :species, :breed, :lighting, :bowl_type,
                 :quality_flag, :blur_score, :phash, :aug_quality, :aug_seed,
                 :parent_frame_id, :is_anomaly_candidate, :anomaly_score,
                 :annotation_status,
-                :modality, :storage_uri, :frame_width, :frame_height, :brightness_score
+                :modality, :storage_uri, :frame_width, :frame_height, :brightness_score,
+                :provenance_type
             )
             """,
             self._record_to_params(frame),
@@ -273,14 +279,16 @@ class FrameStore:
                     quality_flag, blur_score, phash, aug_quality, aug_seed,
                     parent_frame_id, is_anomaly_candidate, anomaly_score,
                     annotation_status,
-                    modality, storage_uri, frame_width, frame_height, brightness_score
+                    modality, storage_uri, frame_width, frame_height, brightness_score,
+                    provenance_type
                 ) VALUES (
                     :frame_id, :video_id, :source, :frame_path, :data_root,
                     :timestamp_ms, :species, :breed, :lighting, :bowl_type,
                     :quality_flag, :blur_score, :phash, :aug_quality, :aug_seed,
                     :parent_frame_id, :is_anomaly_candidate, :anomaly_score,
                     :annotation_status,
-                    :modality, :storage_uri, :frame_width, :frame_height, :brightness_score
+                    :modality, :storage_uri, :frame_width, :frame_height, :brightness_score,
+                    :provenance_type
                 )
                 """,
                 rows,
@@ -564,6 +572,7 @@ class FrameStore:
             frame_width=row["frame_width"] if "frame_width" in row.keys() else None,
             frame_height=row["frame_height"] if "frame_height" in row.keys() else None,
             brightness_score=row["brightness_score"] if "brightness_score" in row.keys() else None,
+            provenance_type=row["provenance_type"] if "provenance_type" in row.keys() else "device",
         )
 
 

@@ -136,6 +136,7 @@ class BaseSource(ABC):
                         frame_width=quality.width,
                         frame_height=quality.height,
                         brightness_score=quality.brightness_score,
+                        provenance_type=self.default_provenance,
                     )
 
                     self.store.insert_frame(record)
