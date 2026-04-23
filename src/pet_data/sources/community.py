@@ -28,6 +28,7 @@ class CommunitySource(BaseSource):
     """
 
     ingester_name = "community"
+    default_provenance = "community"
 
     def __init__(self, store, params: dict) -> None:
         """Initialize with AutoExtractor."""

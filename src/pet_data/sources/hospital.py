@@ -60,6 +60,7 @@ class HospitalSource(BaseSource):
     """
 
     ingester_name = "hospital"
+    default_provenance = "device"  # partner hospital hardware captures (first-party data)
 
     def __init__(self, store, params: dict) -> None:
         """Initialize with AutoExtractor."""

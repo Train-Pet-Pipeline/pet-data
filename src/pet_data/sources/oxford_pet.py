@@ -28,6 +28,7 @@ class OxfordPetSource(BaseSource):
     """
 
     ingester_name = "oxford_pet"
+    default_provenance = "academic_dataset"
 
     def __init__(self, store, params: dict) -> None:
         """Initialize with ImageExtractor."""

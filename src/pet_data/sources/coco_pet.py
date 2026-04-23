@@ -25,6 +25,7 @@ class CocoPetSource(BaseSource):
     """
 
     ingester_name = "coco"
+    default_provenance = "academic_dataset"
 
     def __init__(self, store, params: dict) -> None:
         """Initialize with ImageExtractor."""

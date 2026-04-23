@@ -36,6 +36,7 @@ class LocalDirSource(BaseSource):
     """
 
     ingester_name = "local_dir"
+    default_provenance = "device"  # dev/internal data default; config-overridable at runtime
 
     def __init__(self, store, params: dict) -> None:
         """Initialize with AutoExtractor for mixed image/video content."""

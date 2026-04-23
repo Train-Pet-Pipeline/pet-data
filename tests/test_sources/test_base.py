@@ -15,6 +15,7 @@ class DummySource(BaseSource):
     """Minimal BaseSource implementation for testing."""
 
     ingester_name = "dummy"
+    default_provenance = "device"  # test-only; arbitrary valid literal
 
     def __init__(
         self,

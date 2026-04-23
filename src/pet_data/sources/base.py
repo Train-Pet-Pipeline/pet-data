@@ -6,7 +6,9 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, ClassVar, Literal
+
+from pet_schema.enums import SourceType
 
 from pet_data.processing.dedup import dedup_check
 from pet_data.processing.quality_filter import assess_quality
@@ -66,6 +68,7 @@ class BaseSource(ABC):
     """
 
     ingester_name: str
+    default_provenance: ClassVar[SourceType]
     extractor: FrameExtractor
 
     def __init__(self, store: FrameStore, params: dict) -> None:

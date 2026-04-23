@@ -25,6 +25,7 @@ class SelfShotSource(BaseSource):
     """
 
     ingester_name = "selfshot"
+    default_provenance = "community"  # user-contributed; no separate literal needed
 
     def __init__(self, store, params: dict) -> None:
         """Initialize with VideoExtractor."""

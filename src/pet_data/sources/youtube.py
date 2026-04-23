@@ -20,6 +20,7 @@ class YoutubeSource(BaseSource):
     """
 
     ingester_name = "youtube"
+    default_provenance = "youtube"
 
     def __init__(self, store, params: dict) -> None:
         """Initialize with VideoExtractor."""
