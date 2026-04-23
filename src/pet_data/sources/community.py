@@ -27,7 +27,8 @@ class CommunitySource(BaseSource):
     - praw installed (optional dependency: pip install pet-data[community])
     """
 
-    source_name = "community"
+    ingester_name = "community"
+    default_provenance = "community"
 
     def __init__(self, store, params: dict) -> None:
         """Initialize with AutoExtractor."""
@@ -86,7 +87,7 @@ class CommunitySource(BaseSource):
                         continue
 
                 yield RawItem(
-                    source=self.source_name,
+                    source=self.ingester_name,
                     resource_path=local_path,
                     resource_type=cast(Literal["video", "image"], resource_type),
                     metadata=SourceMetadata(

@@ -19,7 +19,8 @@ class YoutubeSource(BaseSource):
     - yt-dlp installed (optional dependency: pip install pet-data[youtube])
     """
 
-    source_name = "youtube"
+    ingester_name = "youtube"
+    default_provenance = "youtube"
 
     def __init__(self, store, params: dict) -> None:
         """Initialize with VideoExtractor."""
@@ -63,7 +64,7 @@ class YoutubeSource(BaseSource):
 
             if output_path.exists():
                 yield RawItem(
-                    source=self.source_name,
+                    source=self.ingester_name,
                     resource_path=output_path,
                     resource_type="video",
                     metadata=SourceMetadata(
