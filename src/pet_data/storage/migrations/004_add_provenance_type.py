@@ -70,7 +70,9 @@ def upgrade(conn: sqlite3.Connection) -> None:
         raise
 
     # Step 2: Backfill existing rows
-    rows = conn.execute("SELECT frame_id, source FROM frames WHERE provenance_type IS NULL").fetchall()
+    rows = conn.execute(
+        "SELECT frame_id, source FROM frames WHERE provenance_type IS NULL"
+    ).fetchall()
     unknown_sources: list[str] = []
     for frame_id, source in rows:
         provenance = _INGESTER_TO_PROVENANCE.get(source)
@@ -144,7 +146,8 @@ def upgrade(conn: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_frames_status    ON frames(annotation_status);
         CREATE INDEX IF NOT EXISTS idx_frames_source    ON frames(source);
         CREATE INDEX IF NOT EXISTS idx_frames_quality   ON frames(quality_flag);
-        CREATE INDEX IF NOT EXISTS idx_frames_anomaly   ON frames(is_anomaly_candidate, anomaly_score DESC);
+        CREATE INDEX IF NOT EXISTS idx_frames_anomaly
+            ON frames(is_anomaly_candidate, anomaly_score DESC);
         CREATE INDEX IF NOT EXISTS idx_frames_modality  ON frames(modality);
         CREATE INDEX IF NOT EXISTS idx_frames_provenance ON frames(provenance_type);
         """
@@ -177,7 +180,8 @@ def downgrade(conn: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_frames_status    ON frames(annotation_status);
         CREATE INDEX IF NOT EXISTS idx_frames_source    ON frames(source);
         CREATE INDEX IF NOT EXISTS idx_frames_quality   ON frames(quality_flag);
-        CREATE INDEX IF NOT EXISTS idx_frames_anomaly   ON frames(is_anomaly_candidate, anomaly_score DESC);
+        CREATE INDEX IF NOT EXISTS idx_frames_anomaly
+            ON frames(is_anomaly_candidate, anomaly_score DESC);
         CREATE INDEX IF NOT EXISTS idx_frames_modality  ON frames(modality);
         """
     )

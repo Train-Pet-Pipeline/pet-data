@@ -1,8 +1,10 @@
 """Tests for traditional augmentation."""
 from __future__ import annotations
 
+import copy
 from pathlib import Path
 
+import pytest
 from PIL import Image
 
 from pet_data.augmentation.traditional_aug import augment_frame
@@ -39,9 +41,6 @@ class TestAugmentFrame:
         1. Passing params with the 6 sub-keys produces valid output (params readable).
         2. Removing a key causes a KeyError — proving the code actually reads it.
         """
-        import copy
-        import pytest
-
         # Check 1: All 6 params present → success
         params = copy.deepcopy(default_params)
         trad = params["augmentation"]["traditional"]

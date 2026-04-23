@@ -3,8 +3,6 @@ from __future__ import annotations
 
 import typing
 
-import pytest
-
 from pet_data.sources.base import BaseSource
 from pet_data.sources.coco_pet import CocoPetSource
 from pet_data.sources.community import CommunitySource
