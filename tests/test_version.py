@@ -7,7 +7,7 @@ import pet_data
 
 
 def test_pet_data_version():
-    assert pet_data.__version__ == "1.2.0"
+    assert pet_data.__version__ == "1.3.0"
 
 
 def test_pet_data_pins_phase1_foundation():
