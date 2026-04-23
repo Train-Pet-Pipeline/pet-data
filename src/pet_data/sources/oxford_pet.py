@@ -27,7 +27,7 @@ class OxfordPetSource(BaseSource):
     Species inferred: first word capitalized -> cat, lowercase -> dog.
     """
 
-    source_name = "oxford_pet"
+    ingester_name = "oxford_pet"
 
     def __init__(self, store, params: dict) -> None:
         """Initialize with ImageExtractor."""
@@ -52,7 +52,7 @@ class OxfordPetSource(BaseSource):
             species = "cat" if breed[0].isupper() else "dog"
 
             yield RawItem(
-                source=self.source_name,
+                source=self.ingester_name,
                 resource_path=img_path,
                 resource_type="image",
                 metadata=SourceMetadata(

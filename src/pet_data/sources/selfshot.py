@@ -24,7 +24,7 @@ class SelfShotSource(BaseSource):
     - device_model is mandatory for selfshot data.
     """
 
-    source_name = "selfshot"
+    ingester_name = "selfshot"
 
     def __init__(self, store, params: dict) -> None:
         """Initialize with VideoExtractor."""
@@ -55,7 +55,7 @@ class SelfShotSource(BaseSource):
                 meta = {}
 
             yield RawItem(
-                source=self.source_name,
+                source=self.ingester_name,
                 resource_path=video_path,
                 resource_type="video",
                 metadata=SourceMetadata(

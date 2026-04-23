@@ -35,7 +35,7 @@ class LocalDirSource(BaseSource):
     ingested per subdirectory, useful for quick integration tests.
     """
 
-    source_name = "local_dir"
+    ingester_name = "local_dir"
 
     def __init__(self, store, params: dict) -> None:
         """Initialize with AutoExtractor for mixed image/video content."""
@@ -76,7 +76,7 @@ class LocalDirSource(BaseSource):
                     continue
 
                 yield RawItem(
-                    source=self.source_name,
+                    source=self.ingester_name,
                     resource_path=file_path,
                     resource_type=cast(Literal["video", "image"], resource_type),
                     metadata=SourceMetadata(

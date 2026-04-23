@@ -14,7 +14,7 @@ from pet_data.storage.store import FrameStore
 class DummySource(BaseSource):
     """Minimal BaseSource implementation for testing."""
 
-    source_name = "dummy"
+    ingester_name = "dummy"
 
     def __init__(
         self,
