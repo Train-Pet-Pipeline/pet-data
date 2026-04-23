@@ -19,6 +19,14 @@ literals using the user-approved mapping (2026-04-23):
 The existing ``source`` column is preserved (it now semantically holds the
 ingester_name).  A future migration may rename it for clarity once downstream
 consumers are updated.
+
+**Extending SourceType in the future:** If pet-schema's ``SourceType`` gains
+a new literal (e.g., ``restricted_medical``), create a NEW migration file
+(e.g., ``005_extend_provenance_literals.py``) that rebuilds the frames table
+with the updated CHECK constraint. DO NOT modify this file — committed
+Alembic migrations are immutable (CLAUDE.md rule). Same policy applies to
+audio_samples table (currently pinned to the original 4 literals in
+``003_add_audio_samples.py``).
 """
 from __future__ import annotations
 
@@ -158,6 +166,12 @@ def upgrade(conn: sqlite3.Connection) -> None:
 def downgrade(conn: sqlite3.Connection) -> None:
     """Remove provenance_type column via table rebuild.
 
+    **CRITICAL**: SQLite's ``CREATE TABLE x AS SELECT ... FROM y`` creates a table
+    with NO constraints (no PRIMARY KEY, no NOT NULL, no CHECK, no DEFAULT).
+    To preserve all pre-004 constraints on downgrade, this function explicitly
+    recreates the frames table matching the combined post-002 / pre-004 schema
+    (schema.sql + migration 002 additions), then re-populates from a temp copy.
+
     Args:
         conn: An open sqlite3.Connection.
     """
@@ -165,6 +179,7 @@ def downgrade(conn: sqlite3.Connection) -> None:
         """
         DROP INDEX IF EXISTS idx_frames_provenance;
 
+        -- Step 1: stash current rows into an unconstrained temp table.
         CREATE TABLE frames_tmp AS SELECT
             frame_id, video_id, source, frame_path, data_root, timestamp_ms,
             species, breed, lighting, bowl_type, quality_flag, blur_score,
@@ -175,7 +190,44 @@ def downgrade(conn: sqlite3.Connection) -> None:
 
         DROP TABLE frames;
 
-        ALTER TABLE frames_tmp RENAME TO frames;
+        -- Step 2: recreate frames with full pre-004 schema (schema.sql + migration 002).
+        -- Matches exactly: same columns, types, PRIMARY KEY, NOT NULL, DEFAULT, CHECK.
+        CREATE TABLE frames (
+            frame_id        TEXT PRIMARY KEY,
+            video_id        TEXT NOT NULL,
+            source          TEXT NOT NULL,
+            frame_path      TEXT NOT NULL,
+            data_root       TEXT NOT NULL,
+            timestamp_ms    INTEGER,
+            species         TEXT,
+            breed           TEXT,
+            lighting        TEXT CHECK(lighting IN ('bright','dim','infrared_night','unknown')),
+            bowl_type       TEXT,
+            quality_flag    TEXT NOT NULL DEFAULT 'normal'
+                            CHECK(quality_flag IN ('normal','low','failed')),
+            blur_score      REAL,
+            phash           BLOB,
+            aug_quality     TEXT CHECK(aug_quality IN ('ok','failed') OR aug_quality IS NULL),
+            aug_seed        INTEGER,
+            parent_frame_id TEXT,
+            is_anomaly_candidate INTEGER NOT NULL DEFAULT 0,
+            anomaly_score   REAL,
+            annotation_status TEXT NOT NULL DEFAULT 'pending'
+                CHECK(annotation_status IN ('pending','annotating','auto_checked',
+                                            'approved','needs_review','reviewed','rejected','exported')),
+            created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+            -- Migration 002 additions:
+            modality        TEXT NOT NULL DEFAULT 'vision'
+                            CHECK(modality IN ('vision','audio','sensor','multimodal')),
+            storage_uri     TEXT NOT NULL DEFAULT '',
+            frame_width     INTEGER,
+            frame_height    INTEGER,
+            brightness_score REAL
+        );
+
+        -- Step 3: repopulate from temp, drop temp.
+        INSERT INTO frames SELECT * FROM frames_tmp;
+        DROP TABLE frames_tmp;
 
         CREATE INDEX IF NOT EXISTS idx_frames_status    ON frames(annotation_status);
         CREATE INDEX IF NOT EXISTS idx_frames_source    ON frames(source);

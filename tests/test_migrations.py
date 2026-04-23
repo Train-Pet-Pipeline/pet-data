@@ -176,3 +176,65 @@ def test_004_downgrade_removes_provenance_type_column(tmp_path):
     cols = {r[1] for r in conn.execute("PRAGMA table_info(frames)").fetchall()}
     assert "provenance_type" not in cols
     conn.close()
+
+
+def test_004_downgrade_preserves_pre_004_check_constraints(tmp_path):
+    """Migration 004 downgrade preserves all pre-004 CHECK constraints.
+
+    Regression guard: the naive downgrade `CREATE TABLE x AS SELECT ... FROM y`
+    would silently strip all CHECK constraints (data integrity risk). Explicit
+    CREATE TABLE with full schema recreation keeps them.
+    """
+    conn = sqlite3.connect(str(tmp_path / "db.sqlite"))
+    load_migration(1).upgrade(conn)
+    load_migration(2).upgrade(conn)
+    load_migration(3).upgrade(conn)
+    load_migration(4).upgrade(conn)
+    load_migration(4).downgrade(conn)
+
+    # Verify PRIMARY KEY preserved
+    pk_info = [r for r in conn.execute("PRAGMA table_info(frames)").fetchall() if r[5] > 0]
+    pk_cols = [r[1] for r in pk_info]
+    assert pk_cols == ["frame_id"], f"PRIMARY KEY lost after downgrade: {pk_cols}"
+
+    # Verify lighting CHECK constraint preserved (invalid value rejected)
+    conn.execute(
+        """INSERT INTO frames (frame_id, video_id, source, frame_path, data_root)
+           VALUES ('f1', 'v1', 'youtube', 'path/to/frame.jpg', '/data')"""
+    )
+    conn.commit()
+    try:
+        conn.execute("UPDATE frames SET lighting = 'invalid_value' WHERE frame_id = 'f1'")
+        conn.commit()
+        raise AssertionError("lighting CHECK constraint lost — 'invalid_value' accepted")
+    except sqlite3.IntegrityError:
+        pass  # expected — CHECK constraint correctly rejected invalid value
+
+    # Verify quality_flag CHECK preserved
+    try:
+        conn.execute("UPDATE frames SET quality_flag = 'invalid' WHERE frame_id = 'f1'")
+        conn.commit()
+        raise AssertionError("quality_flag CHECK constraint lost after downgrade")
+    except sqlite3.IntegrityError:
+        pass
+
+    # Verify modality CHECK preserved (from migration 002)
+    try:
+        conn.execute("UPDATE frames SET modality = 'invalid' WHERE frame_id = 'f1'")
+        conn.commit()
+        raise AssertionError("modality CHECK constraint lost after downgrade")
+    except sqlite3.IntegrityError:
+        pass
+
+    # Verify NOT NULL preserved (on source column for example)
+    try:
+        conn.execute(
+            """INSERT INTO frames (frame_id, video_id, frame_path, data_root)
+               VALUES ('f2', 'v2', 'path', '/data')"""  # missing source (NOT NULL)
+        )
+        conn.commit()
+        raise AssertionError("NOT NULL on source lost after downgrade")
+    except sqlite3.IntegrityError:
+        pass
+
+    conn.close()
